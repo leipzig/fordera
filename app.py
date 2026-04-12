@@ -146,39 +146,63 @@ def _(upload, mo, cv2, Image, Path, io, base64, tempfile, classifier, gradcam, e
 
 @app.cell
 def _(mo, key_json, cv2, Image, Path, io, base64):
-    def _img_b64(img_path, width=80):
-        """Convert an image file to a small base64 JPEG data URI."""
-        if not Path(img_path).exists():
+    # Build the key HTML iteratively using a stack to avoid marimo
+    # mangling recursive function names (underscore-prefixed functions
+    # get renamed with a cell prefix, breaking self-calls).
+    img_cache = {}
+
+    def make_thumb(img_path, width):
+        key = (img_path, width)
+        if key in img_cache:
+            return img_cache[key]
+        p = Path(img_path)
+        if not p.exists():
+            img_cache[key] = ""
             return ""
-        img = cv2.imread(str(img_path))
-        if img is None:
+        raw = cv2.imread(str(p))
+        if raw is None:
+            img_cache[key] = ""
             return ""
         thumb_size = min(width * 2, 120)
-        img = cv2.resize(img, (thumb_size, thumb_size))
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        pil = Image.fromarray(img_rgb)
+        raw = cv2.resize(raw, (thumb_size, thumb_size))
+        rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+        pil = Image.fromarray(rgb)
         buf = io.BytesIO()
         pil.save(buf, format="JPEG", quality=60)
         b64 = base64.b64encode(buf.getvalue()).decode()
-        return f'<img src="data:image/jpeg;base64,{b64}" width="{width}" style="margin:2px;border:1px solid #ccc;border-radius:4px;vertical-align:middle;">'
+        tag = f'<img src="data:image/jpeg;base64,{b64}" width="{width}" style="margin:2px;border:1px solid #ccc;border-radius:4px;vertical-align:middle;">'
+        img_cache[key] = tag
+        return tag
 
-    def _build_html(node, depth=0):
-        """Build the key as a plain HTML tree with collapsible details elements."""
+    # Post-order iterative tree traversal: first collect all nodes,
+    # then build HTML bottom-up so each parent can embed its children.
+    nodes_in_order = []
+    stack = [(key_json, 0)]
+    while stack:
+        node, depth = stack.pop()
+        nodes_in_order.append((node, depth))
+        if node["type"] == "decision":
+            stack.append((node["no"], depth + 1))
+            stack.append((node["yes"], depth + 1))
+
+    # Reverse so leaves come first (post-order)
+    nodes_in_order.reverse()
+    html_map = {}
+
+    for node, depth in nodes_in_order:
+        node_id = id(node)
         if node["type"] == "leaf":
             label = node["label"]
-            imgs = "".join(_img_b64(p, 80) for p in node.get("example_images", [])[:1])
-            return f'<div style="margin:6px 0;padding:6px 10px;background:#e8f5e9;border-radius:6px;display:inline-block;"><strong>{label}</strong> {imgs}</div>\n'
-
-        question = node["question"]
-        yes_imgs = "".join(_img_b64(p, 56) for p in node.get("yes_images", [])[:1])
-        no_imgs = "".join(_img_b64(p, 56) for p in node.get("no_images", [])[:1])
-
-        yes_html = _build_html(node["yes"], depth + 1)
-        no_html = _build_html(node["no"], depth + 1)
-
-        open_attr = " open" if depth < 1 else ""
-
-        return f"""<details{open_attr} style="margin:4px 0;border-left:2px solid #1976d2;padding-left:10px;">
+            imgs = "".join(make_thumb(p, 80) for p in node.get("example_images", [])[:1])
+            html_map[node_id] = f'<div style="margin:6px 0;padding:6px 10px;background:#e8f5e9;border-radius:6px;display:inline-block;"><strong>{label}</strong> {imgs}</div>'
+        else:
+            question = node["question"]
+            yes_imgs = "".join(make_thumb(p, 56) for p in node.get("yes_images", [])[:1])
+            no_imgs = "".join(make_thumb(p, 56) for p in node.get("no_images", [])[:1])
+            yes_html = html_map[id(node["yes"])]
+            no_html = html_map[id(node["no"])]
+            open_attr = " open" if depth < 1 else ""
+            html_map[node_id] = f"""<details{open_attr} style="margin:4px 0;border-left:2px solid #1976d2;padding-left:10px;">
   <summary style="cursor:pointer;font-weight:bold;padding:3px 0;font-size:14px;">{question}</summary>
   <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;">
     <div style="flex:1;min-width:180px;">
@@ -190,11 +214,11 @@ def _(mo, key_json, cv2, Image, Path, io, base64):
       {no_html}
     </div>
   </div>
-</details>
-"""
+</details>"""
 
-    key_html = f"<h2>Interactive Dichotomous Key</h2>\n<p><em>Click questions to expand. Each branch shows example truck photos.</em></p>\n{_build_html(key_json)}"
-    mo.Html(key_html)
+    root_html = html_map[id(key_json)]
+    full_html = f"<h2>Interactive Dichotomous Key</h2>\n<p><em>Click questions to expand. Each branch shows example truck photos.</em></p>\n{root_html}"
+    mo.Html(full_html)
     return
 
 
