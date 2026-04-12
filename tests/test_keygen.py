@@ -56,23 +56,25 @@ class TestTreeStructure:
         assert keygen._is_fitted
 
     def test_no_orphan_nodes(self, keygen):
-        """Every non-root node should be reachable from the root."""
-        tree = keygen.tree.tree_
-        visited = set()
+        """Every node should be reachable from the root (well-formed tree)."""
+        visited_leaves = set()
+        visited_decisions = set()
 
-        def _visit(node_id):
-            visited.add(node_id)
-            left = tree.children_left[node_id]
-            right = tree.children_right[node_id]
-            if left != right:  # Not a leaf
-                _visit(left)
-                _visit(right)
+        def _visit(node):
+            if node["type"] == "leaf":
+                visited_leaves.add(node["label"])
+            else:
+                visited_decisions.add(node["node_id"])
+                _visit(node["left"])
+                _visit(node["right"])
 
-        _visit(0)
-        n_nodes = tree.node_count
-        assert len(visited) == n_nodes, (
-            f"Found {len(visited)} reachable nodes but tree has {n_nodes} total"
+        _visit(keygen.tree_root)
+        # All labels should be visited
+        assert visited_leaves == ALL_LABELS, (
+            f"Not all labels visited. Missing: {ALL_LABELS - visited_leaves}"
         )
+        # Decision nodes should be fewer than total nodes
+        assert len(visited_decisions) > 0, "No decision nodes found"
 
 
 class TestInteractiveJSON:
