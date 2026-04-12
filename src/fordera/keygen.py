@@ -41,6 +41,29 @@ class DichotomousKeyGenerator:
         Z = linkage(avg_embeddings, method="ward")
         root_node = to_tree(Z)
 
+        # Reorder tree so leaves go left-to-right from earliest to latest year
+        def _min_year(node):
+            """Return the minimum year found among leaves under this node."""
+            if node.is_leaf():
+                label = unique_labels[node.id]
+                # Extract first year from labels like "1948-1950" or "1951"
+                return int(label.split("-")[0])
+            return min(_min_year(node.get_left()), _min_year(node.get_right()))
+
+        def _reorder(node):
+            """Recursively swap children so the earlier-year subtree is on the left."""
+            if node.is_leaf():
+                return
+            _reorder(node.get_left())
+            _reorder(node.get_right())
+            left_min = _min_year(node.get_left())
+            right_min = _min_year(node.get_right())
+            if right_min < left_min:
+                # Swap children
+                node.left, node.right = node.right, node.left
+
+        _reorder(root_node)
+
         # Convert scipy tree to our dict tree
         node_counter = [0]
 
