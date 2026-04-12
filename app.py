@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.13.0"
-app = marimo.App(width="medium", app_title="Ford F-Series Classifier")
+app = marimo.App(width="full", app_title="Ford F-Series Classifier")
 
 
 @app.cell
@@ -59,14 +59,10 @@ def _(mo):
         The classifier uses a pre-trained ResNet50 backbone with cosine-similarity matching.
         Grad-CAM heatmaps show which visual features drove the classification.
         An automatically generated dichotomous key helps you identify trucks step-by-step.
+
+        ## Upload a Truck Photo
         """
     )
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("## Upload a Truck Photo")
     return
 
 
@@ -149,12 +145,6 @@ def _(upload, mo, cv2, Image, Path, io, base64, tempfile, classifier, gradcam, e
 
 
 @app.cell
-def _(mo):
-    mo.md("## Interactive Dichotomous Key")
-    return
-
-
-@app.cell
 def _(mo, key_json, cv2, Image, Path, io, base64):
     def _img_b64(img_path, width=80):
         """Convert an image file to a small base64 JPEG data URI."""
@@ -163,7 +153,6 @@ def _(mo, key_json, cv2, Image, Path, io, base64):
         img = cv2.imread(str(img_path))
         if img is None:
             return ""
-        # Resize to small thumbnail to keep HTML payload manageable
         thumb_size = min(width * 2, 120)
         img = cv2.resize(img, (thumb_size, thumb_size))
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -175,44 +164,37 @@ def _(mo, key_json, cv2, Image, Path, io, base64):
 
     def _build_html(node, depth=0):
         """Build the key as a plain HTML tree with collapsible details elements."""
-        indent = "  " * depth
         if node["type"] == "leaf":
             label = node["label"]
             imgs = "".join(_img_b64(p, 80) for p in node.get("example_images", [])[:1])
-            return f'{indent}<div style="margin:8px 0;padding:8px;background:#e8f5e9;border-radius:6px;display:inline-block;"><strong>{label}</strong><br>{imgs}</div>\n'
+            return f'<div style="margin:6px 0;padding:6px 10px;background:#e8f5e9;border-radius:6px;display:inline-block;"><strong>{label}</strong> {imgs}</div>\n'
 
         question = node["question"]
-        yes_imgs = "".join(_img_b64(p, 60) for p in node.get("yes_images", [])[:1])
-        no_imgs = "".join(_img_b64(p, 60) for p in node.get("no_images", [])[:1])
+        yes_imgs = "".join(_img_b64(p, 56) for p in node.get("yes_images", [])[:1])
+        no_imgs = "".join(_img_b64(p, 56) for p in node.get("no_images", [])[:1])
 
         yes_html = _build_html(node["yes"], depth + 1)
         no_html = _build_html(node["no"], depth + 1)
 
-        open_attr = " open" if depth < 2 else ""
+        open_attr = " open" if depth < 1 else ""
 
-        return f"""{indent}<details{open_attr} style="margin:6px 0;border-left:3px solid #1976d2;padding-left:12px;">
-{indent}  <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">{question}</summary>
-{indent}  <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:8px;">
-{indent}    <div style="flex:1;min-width:200px;">
-{indent}      <div style="color:#2e7d32;font-weight:bold;margin-bottom:4px;">Yes {yes_imgs}</div>
-{indent}      {yes_html}
-{indent}    </div>
-{indent}    <div style="flex:1;min-width:200px;">
-{indent}      <div style="color:#c62828;font-weight:bold;margin-bottom:4px;">No {no_imgs}</div>
-{indent}      {no_html}
-{indent}    </div>
-{indent}  </div>
-{indent}</details>
+        return f"""<details{open_attr} style="margin:4px 0;border-left:2px solid #1976d2;padding-left:10px;">
+  <summary style="cursor:pointer;font-weight:bold;padding:3px 0;font-size:14px;">{question}</summary>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;">
+    <div style="flex:1;min-width:180px;">
+      <div style="color:#2e7d32;font-weight:bold;margin-bottom:3px;font-size:13px;">Yes {yes_imgs}</div>
+      {yes_html}
+    </div>
+    <div style="flex:1;min-width:180px;">
+      <div style="color:#c62828;font-weight:bold;margin-bottom:3px;font-size:13px;">No {no_imgs}</div>
+      {no_html}
+    </div>
+  </div>
+</details>
 """
 
-    key_html = _build_html(key_json)
+    key_html = f"<h2>Interactive Dichotomous Key</h2>\n<p><em>Click questions to expand. Each branch shows example truck photos.</em></p>\n{_build_html(key_json)}"
     mo.Html(key_html)
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md("## Printable Key")
     return
 
 
@@ -223,7 +205,10 @@ def _(mo, Path):
 
     if svg_path.exists():
         svg_content = svg_path.read_text()
-        parts = []
+        # Wrap SVG in a scrollable container that fits the page
+        wrapped_svg = f'<div style="overflow:auto;max-width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;background:#fafafa;">{svg_content}</div>'
+
+        parts = [mo.md("## Printable Key")]
         if pdf_path.exists():
             parts.append(
                 mo.download(
@@ -233,10 +218,10 @@ def _(mo, Path):
                     label="Download PDF",
                 )
             )
-        parts.append(mo.Html(svg_content))
+        parts.append(mo.Html(wrapped_svg))
         printable = mo.vstack(parts)
     else:
-        printable = mo.md("*Printable key not generated yet. Run the key generator first.*")
+        printable = mo.md("## Printable Key\n\n*Not generated yet. Run the key generator first.*")
 
     printable
     return
