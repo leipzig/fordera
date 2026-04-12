@@ -19,6 +19,7 @@ class DichotomousKeyGenerator:
         self.label_encoder = LabelEncoder()
         self.tree_root = None  # dict tree structure
         self.node_descriptions = {}  # node_id -> English question
+        self.node_examples = {}  # node_id -> {"yes_images": [...], "no_images": [...]}
         self._all_labels = []
         self._is_fitted = False
 
@@ -110,6 +111,10 @@ class DichotomousKeyGenerator:
                 excluded_questions=ancestor_questions,
             )
             self.node_descriptions[node["node_id"]] = question
+            self.node_examples[node["node_id"]] = {
+                "yes_images": [str(p) for p in left_paths[:3]],
+                "no_images": [str(p) for p in right_paths[:3]],
+            }
 
             left_summary = ", ".join(left_labels[:4])
             right_summary = ", ".join(right_labels[:4])
@@ -174,9 +179,12 @@ class DichotomousKeyGenerator:
                     "example_images": image_lookup.get(node["label"], []),
                 }
             question = self._question_for_node(node["node_id"])
+            examples = self.node_examples.get(node["node_id"], {})
             return {
                 "type": "decision",
                 "question": question,
+                "yes_images": examples.get("yes_images", []),
+                "no_images": examples.get("no_images", []),
                 "yes": _build(node["left"]),
                 "no": _build(node["right"]),
             }
@@ -233,6 +241,7 @@ class DichotomousKeyGenerator:
             "tree_root": self.tree_root,
             "all_labels": self._all_labels,
             "node_descriptions": self.node_descriptions,
+            "node_examples": self.node_examples,
         }
         with open(path / "keygen.pkl", "wb") as f:
             pickle.dump(state, f)
@@ -244,6 +253,7 @@ class DichotomousKeyGenerator:
         self.tree_root = state["tree_root"]
         self._all_labels = state["all_labels"]
         self.node_descriptions = state.get("node_descriptions", {})
+        self.node_examples = state.get("node_examples", {})
         self._is_fitted = True
 
 

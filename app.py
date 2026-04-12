@@ -156,32 +156,52 @@ def _(mo):
 
 @app.cell
 def _(mo, key_json, cv2, Image, Path, io, base64):
+    def _img_tag(img_path, width=100):
+        """Convert an image file to an inline HTML img tag."""
+        if not Path(img_path).exists():
+            return ""
+        img = cv2.imread(str(img_path))
+        if img is None:
+            return ""
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        pil = Image.fromarray(img_rgb)
+        buf = io.BytesIO()
+        pil.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return f'<img src="data:image/png;base64,{b64}" width="{width}" style="margin:2px;border:1px solid #ccc;border-radius:4px;">'
+
     def _build_key_ui(node, depth=0):
         if node["type"] == "leaf":
             label = node["label"]
-            imgs_html = ""
-            for img_path in node.get("example_images", [])[:2]:
-                if Path(img_path).exists():
-                    img = cv2.imread(img_path)
-                    if img is not None:
-                        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                        pil = Image.fromarray(img_rgb)
-                        buf = io.BytesIO()
-                        pil.save(buf, format="PNG")
-                        b64 = base64.b64encode(buf.getvalue()).decode()
-                        imgs_html += f'<img src="data:image/png;base64,{b64}" width="112" style="margin:2px;border:1px solid #ccc;border-radius:4px;">'
-
+            imgs_html = "".join(
+                _img_tag(p, 112) for p in node.get("example_images", [])[:2]
+            )
             return mo.md(f"**{label}**\n\n{imgs_html}")
 
         question = node["question"]
+
+        # Build example images for yes/no sides
+        yes_imgs = "".join(
+            _img_tag(p, 80) for p in node.get("yes_images", [])[:3]
+        )
+        no_imgs = "".join(
+            _img_tag(p, 80) for p in node.get("no_images", [])[:3]
+        )
+
         yes_content = _build_key_ui(node["yes"], depth + 1)
         no_content = _build_key_ui(node["no"], depth + 1)
 
         return mo.accordion({
             f"{question}": mo.vstack([
                 mo.hstack([
-                    mo.accordion({"Yes": yes_content}),
-                    mo.accordion({"No": no_content}),
+                    mo.vstack([
+                        mo.md(f'**Yes** {yes_imgs}'),
+                        mo.accordion({"Explore Yes branch": yes_content}),
+                    ]),
+                    mo.vstack([
+                        mo.md(f'**No** {no_imgs}'),
+                        mo.accordion({"Explore No branch": no_content}),
+                    ]),
                 ]),
             ]),
         })
