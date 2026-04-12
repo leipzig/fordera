@@ -100,7 +100,7 @@ class DichotomousKeyGenerator:
         Each node avoids reusing questions from its ancestors so the key
         has diverse, meaningful questions at every level.
         """
-        from fordera.describer import CLIPDescriber
+        from fordera.describer import CLIPDescriber, crop_region_for_question
 
         label_to_paths = {}
         for entry in manifest:
@@ -133,10 +133,12 @@ class DichotomousKeyGenerator:
                 left_paths[:10], right_paths[:10],
                 excluded_questions=ancestor_questions,
             )
+            crop = crop_region_for_question(question)
             self.node_descriptions[node["node_id"]] = question
             self.node_examples[node["node_id"]] = {
                 "yes_images": [str(p) for p in left_paths[:3]],
                 "no_images": [str(p) for p in right_paths[:3]],
+                "crop": crop,
             }
 
             left_summary = ", ".join(left_labels[:4])
@@ -208,6 +210,7 @@ class DichotomousKeyGenerator:
                 "question": question,
                 "yes_images": examples.get("yes_images", []),
                 "no_images": examples.get("no_images", []),
+                "crop": list(examples.get("crop", [0, 0.75, 0, 1])),
                 "yes": _build(node["left"]),
                 "no": _build(node["right"]),
             }

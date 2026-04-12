@@ -151,27 +151,39 @@ def _(mo, key_json, cv2, Image, Path, io, base64):
     # get renamed with a cell prefix, breaking self-calls).
     img_cache = {}
 
-    def make_thumb(img_path, width):
-        key = (img_path, width)
-        if key in img_cache:
-            return img_cache[key]
+    def make_thumb(img_path, width, crop=None):
+        """Make a JPEG thumbnail, optionally cropped to a region of interest.
+
+        crop: (y_start, y_end, x_start, x_end) as fractions 0-1, or None for full image.
+        """
+        cache_key = (img_path, width, tuple(crop) if crop else None)
+        if cache_key in img_cache:
+            return img_cache[cache_key]
         p = Path(img_path)
         if not p.exists():
-            img_cache[key] = ""
+            img_cache[cache_key] = ""
             return ""
         raw = cv2.imread(str(p))
         if raw is None:
-            img_cache[key] = ""
+            img_cache[cache_key] = ""
             return ""
-        thumb_size = min(width * 2, 120)
-        raw = cv2.resize(raw, (thumb_size, thumb_size))
+        # Crop to region of interest
+        if crop:
+            h, w = raw.shape[:2]
+            y1, y2, x1, x2 = crop
+            raw = raw[int(y1 * h):int(y2 * h), int(x1 * w):int(x2 * w)]
+        # Resize keeping aspect ratio, fitting within width x width box
+        h, w = raw.shape[:2]
+        scale = min(width * 2 / w, width * 2 / h)
+        new_w, new_h = int(w * scale), int(h * scale)
+        raw = cv2.resize(raw, (new_w, new_h))
         rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
         pil = Image.fromarray(rgb)
         buf = io.BytesIO()
-        pil.save(buf, format="JPEG", quality=60)
+        pil.save(buf, format="JPEG", quality=70)
         b64 = base64.b64encode(buf.getvalue()).decode()
         tag = f'<img src="data:image/jpeg;base64,{b64}" width="{width}" style="margin:2px;border:1px solid #ccc;border-radius:4px;vertical-align:middle;">'
-        img_cache[key] = tag
+        img_cache[cache_key] = tag
         return tag
 
     # Post-order iterative tree traversal: first collect all nodes,
@@ -197,8 +209,9 @@ def _(mo, key_json, cv2, Image, Path, io, base64):
             html_map[node_id] = f'<div style="margin:6px 0;padding:6px 10px;background:#e8f5e9;border-radius:6px;display:inline-block;"><strong>{label}</strong> {imgs}</div>'
         else:
             question = node["question"]
-            yes_imgs = "".join(make_thumb(p, 56) for p in node.get("yes_images", [])[:1])
-            no_imgs = "".join(make_thumb(p, 56) for p in node.get("no_images", [])[:1])
+            crop = node.get("crop", None)
+            yes_imgs = "".join(make_thumb(p, 70, crop) for p in node.get("yes_images", [])[:1])
+            no_imgs = "".join(make_thumb(p, 70, crop) for p in node.get("no_images", [])[:1])
             yes_html = html_map[id(node["yes"])]
             no_html = html_map[id(node["no"])]
             open_attr = " open" if depth < 1 else ""

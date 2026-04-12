@@ -62,6 +62,46 @@ FEATURE_VOCABULARY = [
 ]
 
 
+# Map keywords in questions to crop regions (y_start, y_end, x_start, x_end)
+# as fractions of image dimensions. These define the area of interest
+# that should be shown to the user at each decision node.
+FEATURE_CROP_REGIONS = {
+    "grille": (0.15, 0.65, 0.15, 0.85),
+    "headlight": (0.15, 0.55, 0.0, 1.0),
+    "bumper": (0.55, 0.85, 0.05, 0.95),
+    "hood": (0.0, 0.35, 0.05, 0.95),
+    "fender": (0.15, 0.60, 0.0, 1.0),
+    "turn signal": (0.40, 0.70, 0.0, 1.0),
+    "parking light": (0.40, 0.70, 0.0, 1.0),
+    "windshield": (0.0, 0.30, 0.1, 0.9),
+    "lettering": (0.0, 0.30, 0.15, 0.85),
+    "character line": (0.20, 0.55, 0.0, 1.0),
+}
+
+# Default crop: upper 2/3 of image (front end without wheels)
+DEFAULT_CROP = (0.0, 0.75, 0.0, 1.0)
+
+
+def crop_region_for_question(question: str) -> tuple:
+    """Return the (y_start, y_end, x_start, x_end) crop region for a question.
+
+    Matches keywords in the question text to known feature regions.
+    Returns fractions of image dimensions (0-1).
+    """
+    q_lower = question.lower()
+    for keyword, region in FEATURE_CROP_REGIONS.items():
+        if keyword in q_lower:
+            return region
+    # Check compound terms
+    if "front end" in q_lower or "angular" in q_lower or "aerodynamic" in q_lower:
+        return (0.0, 0.75, 0.0, 1.0)
+    if "art-deco" in q_lower or "streamlined" in q_lower:
+        return (0.0, 0.75, 0.0, 1.0)
+    if "rounded" in q_lower:
+        return (0.10, 0.60, 0.0, 1.0)
+    return DEFAULT_CROP
+
+
 class CLIPDescriber:
     """Use CLIP to find the best English description for a set of images."""
 
