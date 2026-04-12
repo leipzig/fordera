@@ -156,58 +156,57 @@ def _(mo):
 
 @app.cell
 def _(mo, key_json, cv2, Image, Path, io, base64):
-    def _img_tag(img_path, width=100):
-        """Convert an image file to an inline HTML img tag."""
+    def _img_b64(img_path, width=80):
+        """Convert an image file to a small base64 JPEG data URI."""
         if not Path(img_path).exists():
             return ""
         img = cv2.imread(str(img_path))
         if img is None:
             return ""
+        # Resize to small thumbnail to keep HTML payload manageable
+        thumb_size = min(width * 2, 120)
+        img = cv2.resize(img, (thumb_size, thumb_size))
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         pil = Image.fromarray(img_rgb)
         buf = io.BytesIO()
-        pil.save(buf, format="PNG")
+        pil.save(buf, format="JPEG", quality=60)
         b64 = base64.b64encode(buf.getvalue()).decode()
-        return f'<img src="data:image/png;base64,{b64}" width="{width}" style="margin:2px;border:1px solid #ccc;border-radius:4px;">'
+        return f'<img src="data:image/jpeg;base64,{b64}" width="{width}" style="margin:2px;border:1px solid #ccc;border-radius:4px;vertical-align:middle;">'
 
-    def _build_key_ui(node, depth=0):
+    def _build_html(node, depth=0):
+        """Build the key as a plain HTML tree with collapsible details elements."""
+        indent = "  " * depth
         if node["type"] == "leaf":
             label = node["label"]
-            imgs_html = "".join(
-                _img_tag(p, 112) for p in node.get("example_images", [])[:2]
-            )
-            return mo.md(f"**{label}**\n\n{imgs_html}")
+            imgs = "".join(_img_b64(p, 80) for p in node.get("example_images", [])[:1])
+            return f'{indent}<div style="margin:8px 0;padding:8px;background:#e8f5e9;border-radius:6px;display:inline-block;"><strong>{label}</strong><br>{imgs}</div>\n'
 
         question = node["question"]
+        yes_imgs = "".join(_img_b64(p, 60) for p in node.get("yes_images", [])[:1])
+        no_imgs = "".join(_img_b64(p, 60) for p in node.get("no_images", [])[:1])
 
-        # Build example images for yes/no sides
-        yes_imgs = "".join(
-            _img_tag(p, 80) for p in node.get("yes_images", [])[:3]
-        )
-        no_imgs = "".join(
-            _img_tag(p, 80) for p in node.get("no_images", [])[:3]
-        )
+        yes_html = _build_html(node["yes"], depth + 1)
+        no_html = _build_html(node["no"], depth + 1)
 
-        yes_content = _build_key_ui(node["yes"], depth + 1)
-        no_content = _build_key_ui(node["no"], depth + 1)
+        open_attr = " open" if depth < 2 else ""
 
-        return mo.accordion({
-            f"{question}": mo.vstack([
-                mo.hstack([
-                    mo.vstack([
-                        mo.md(f'**Yes** {yes_imgs}'),
-                        mo.accordion({"Explore Yes branch": yes_content}),
-                    ]),
-                    mo.vstack([
-                        mo.md(f'**No** {no_imgs}'),
-                        mo.accordion({"Explore No branch": no_content}),
-                    ]),
-                ]),
-            ]),
-        })
+        return f"""{indent}<details{open_attr} style="margin:6px 0;border-left:3px solid #1976d2;padding-left:12px;">
+{indent}  <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">{question}</summary>
+{indent}  <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:8px;">
+{indent}    <div style="flex:1;min-width:200px;">
+{indent}      <div style="color:#2e7d32;font-weight:bold;margin-bottom:4px;">Yes {yes_imgs}</div>
+{indent}      {yes_html}
+{indent}    </div>
+{indent}    <div style="flex:1;min-width:200px;">
+{indent}      <div style="color:#c62828;font-weight:bold;margin-bottom:4px;">No {no_imgs}</div>
+{indent}      {no_html}
+{indent}    </div>
+{indent}  </div>
+{indent}</details>
+"""
 
-    key_ui = _build_key_ui(key_json)
-    key_ui
+    key_html = _build_html(key_json)
+    mo.Html(key_html)
     return
 
 
