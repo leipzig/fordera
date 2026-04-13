@@ -113,14 +113,17 @@ python src/fordera/scraper.py
 # 2. Mask year text and resize
 python src/fordera/preprocessor.py
 
-# 3. Train classifier
+# 3. Train classifier (includes leave-one-out evaluation)
 python src/fordera/classifier.py
 
-# 4. Generate Grad-CAM features
+# 4. Generate Grad-CAM features and overlay images
 python src/fordera/interpretability.py
 
-# 5. Build dichotomous key (downloads CLIP model on first run)
+# 5. Build dichotomous key (downloads CLIP ViT-B/32 on first run)
 python src/fordera/keygen.py
+
+# 6. Evaluate the key as a standalone classifier (CLIP answers questions, no model)
+python src/fordera/evaluate_key.py
 ```
 
 ### Run the app
