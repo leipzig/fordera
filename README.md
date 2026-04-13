@@ -143,3 +143,17 @@ The test suite covers:
 **Why CLIP for descriptions?** The model needs to generate English questions that a human can answer while looking at a truck. CLIP bridges the gap between the embedding space (where the splits happen) and natural language. At each split, it evaluates which visual feature description best separates the two groups of truck images.
 
 **Why mask the year text?** Several source images have the model year overlaid as text. Without masking, the model would learn to OCR the text rather than recognize visual features — achieving perfect accuracy on training data but learning nothing about truck design.
+
+## Algorithms and references
+
+| Component | Algorithm | Reference |
+|---|---|---|
+| Feature extraction | [ResNet-50](https://arxiv.org/abs/1512.03385) (He et al., 2015) | Deep Residual Learning for Image Recognition |
+| Feature descriptions | [CLIP](https://arxiv.org/abs/2103.00020) ViT-B/32 (Radford et al., 2021) | Learning Transferable Visual Models From Natural Language Supervision |
+| Interpretability | [Grad-CAM](https://arxiv.org/abs/1610.02391) (Selvaraju et al., 2017) | Gradient-weighted Class Activation Mapping |
+| Hierarchical clustering | [Ward's method](https://doi.org/10.1080/01621459.1963.10500845) (Ward, 1963) | Hierarchical Grouping to Optimize an Objective Function |
+| Classification | [k-Nearest Neighbors](https://doi.org/10.1109/TIT.1967.1053964) with cosine similarity | Cover & Hart, 1967 |
+| Text detection | [EasyOCR](https://github.com/JaidedAI/EasyOCR) | CRAFT-based text detection + recognition |
+| Image inpainting | [Telea inpainting](https://doi.org/10.1016/S1047-3203(03)00009-7) via OpenCV | An Image Inpainting Technique Based on the Fast Marching Method |
+| Visualization | [Graphviz](https://graphviz.org/) | Open-source graph visualization |
+| App framework | [Marimo](https://github.com/marimo-team/marimo) | Reactive Python notebooks |
