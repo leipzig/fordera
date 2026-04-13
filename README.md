@@ -150,6 +150,32 @@ The test suite covers:
 
 **Why mask the year text?** Several source images have the model year overlaid as text. Without masking, the model would learn to OCR the text rather than recognize visual features — achieving perfect accuracy on training data but learning nothing about truck design.
 
+## Evaluation results
+
+### ResNet k-NN classifier (primary model)
+
+Leave-one-out cross-validation on the 33-image dataset:
+
+| Metric | Accuracy | Baseline (random) |
+|---|---|---|
+| Year-level | 0% (0/33) | 3.7% (1/27) |
+| Generation-level | **97%** (32/33) | 16.7% (1/6) |
+
+Exact year accuracy is 0% because adjacent years within a generation have nearly identical front-end styling (cosine similarity >0.98). But the model gets the right generation 97% of the time — only the 1948-1950 F-1 is misclassified (matched to 1959 instead of another Gen 1 truck). On training data with augmentation, year-level accuracy is near 100%.
+
+### Dichotomous key alone (CLIP as question-answerer, no classifier)
+
+To test whether the key works as a standalone tool without the learning model, CLIP (ViT-B/32) answers each yes/no question at every decision node and follows the tree to a leaf:
+
+| Metric | Accuracy | Baseline (random) |
+|---|---|---|
+| Year-level | 3% (1/33) | 3.7% (1/27) |
+| Generation-level | **27%** (9/33) | 16.7% (1/6) |
+
+The key with CLIP is above random chance at the generation level (27% vs 17%) but essentially at chance for exact years. CLIP handles the coarse splits (early round-fendered trucks vs later boxy ones) but can't reliably answer fine-grained questions like "Does it have a honeycomb pattern grille?" on small 224px crops. The key is designed for **human eyes** — a person can count grille bars and spot headlight shapes far better than CLIP's zero-shot visual QA.
+
+Run the evaluation: `python src/fordera/evaluate_key.py`
+
 ## Algorithms and references
 
 | Component | Algorithm | Reference |
