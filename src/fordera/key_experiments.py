@@ -306,6 +306,131 @@ if __name__ == "__main__":
     print(f"  Year accuracy:       {res6['year_acc']:.1%} ({res6['year_correct']}/{res6['total']})")
     print(f"  Generation accuracy: {res6['gen_acc']:.1%} ({res6['gen_correct']}/{res6['total']})")
 
+    print("\n" + "=" * 70)
+    print("EXPERIMENT 7: Random forest of keys — vote across multiple diverse trees")
+    print("=" * 70)
+
+    # Build a forest: multiple trees using different clustering methods + bootstrap samples
+    print("  Building forest (this takes a while)...")
+    forest = []
+    methods = ["ward", "complete", "average", "ward", "complete"]
+    rng = np.random.RandomState(42)
+
+    for i, method in enumerate(methods):
+        # Bootstrap: resample the per-label averaged embeddings with replacement
+        # to induce diversity in tree structure
+        base_labels = [l.split("_")[0] for l in labels]
+        unique_labels = sorted(set(base_labels))
+        avg_embs = []
+        for ul in unique_labels:
+            mask = [j for j, bl in enumerate(base_labels) if bl == ul]
+            # Bootstrap: sample with replacement from this label's images
+            sampled = rng.choice(mask, size=len(mask), replace=True)
+            avg_embs.append(embeddings[sampled].mean(axis=0))
+        avg_embs = normalize(np.array(avg_embs))
+
+        Z = linkage(avg_embs, method=method)
+        root_i = to_tree(Z)
+
+        def min_year(node):
+            if node.is_leaf():
+                return int(unique_labels[node.id].split("-")[0])
+            return min(min_year(node.get_left()), min_year(node.get_right()))
+
+        def reorder(node):
+            if node.is_leaf():
+                return
+            reorder(node.get_left())
+            reorder(node.get_right())
+            if min_year(node.get_right()) < min_year(node.get_left()):
+                node.left, node.right = node.right, node.left
+
+        reorder(root_i)
+        key_i = build_standard_key(root_i, unique_labels, manifest, describer)
+        forest.append(key_i)
+        print(f"    Tree {i+1}/{len(methods)} built ({method})")
+
+    # Evaluate by walking each tree and majority-voting
+    from collections import Counter
+
+    forest_results = []
+    for entry in manifest:
+        path = Path(entry["processed_path"])
+        actual = entry["label"].split("_")[0]
+
+        votes = []
+        for tree in forest:
+            node = tree
+            while node["type"] != "leaf":
+                answer = ans1(path, node["question"])
+                node = node["yes"] if answer else node["no"]
+            votes.append(node["label"])
+
+        # Majority vote; fallback to most common generation if year vote tied
+        vote_counts = Counter(votes)
+        predicted = vote_counts.most_common(1)[0][0]
+
+        actual_gen = YEAR_TO_GENERATION.get(actual, actual)
+        pred_gen = YEAR_TO_GENERATION.get(predicted, predicted)
+
+        forest_results.append({
+            "actual": actual,
+            "predicted": predicted,
+            "correct": actual == predicted,
+            "gen_correct": actual_gen == pred_gen,
+        })
+
+    total = len(forest_results)
+    res7 = {
+        "year_acc": sum(r["correct"] for r in forest_results) / total,
+        "gen_acc": sum(r["gen_correct"] for r in forest_results) / total,
+        "year_correct": sum(r["correct"] for r in forest_results),
+        "gen_correct": sum(r["gen_correct"] for r in forest_results),
+        "total": total,
+    }
+    print(f"  Year accuracy:       {res7['year_acc']:.1%} ({res7['year_correct']}/{res7['total']})")
+    print(f"  Generation accuracy: {res7['gen_acc']:.1%} ({res7['gen_correct']}/{res7['total']})")
+
+    print("\n" + "=" * 70)
+    print("EXPERIMENT 8: Forest + cropping — vote + crop to region of interest")
+    print("=" * 70)
+    forest_cropped_results = []
+    for entry in manifest:
+        path = Path(entry["processed_path"])
+        actual = entry["label"].split("_")[0]
+
+        votes = []
+        for tree in forest:
+            node = tree
+            while node["type"] != "leaf":
+                answer = ans2(path, node["question"])
+                node = node["yes"] if answer else node["no"]
+            votes.append(node["label"])
+
+        vote_counts = Counter(votes)
+        predicted = vote_counts.most_common(1)[0][0]
+
+        actual_gen = YEAR_TO_GENERATION.get(actual, actual)
+        pred_gen = YEAR_TO_GENERATION.get(predicted, predicted)
+
+        forest_cropped_results.append({
+            "actual": actual,
+            "predicted": predicted,
+            "correct": actual == predicted,
+            "gen_correct": actual_gen == pred_gen,
+        })
+
+    total = len(forest_cropped_results)
+    res8 = {
+        "year_acc": sum(r["correct"] for r in forest_cropped_results) / total,
+        "gen_acc": sum(r["gen_correct"] for r in forest_cropped_results) / total,
+        "year_correct": sum(r["correct"] for r in forest_cropped_results),
+        "gen_correct": sum(r["gen_correct"] for r in forest_cropped_results),
+        "total": total,
+    }
+    print(f"  Year accuracy:       {res8['year_acc']:.1%} ({res8['year_correct']}/{res8['total']})")
+    print(f"  Generation accuracy: {res8['gen_acc']:.1%} ({res8['gen_correct']}/{res8['total']})")
+
     # Summary
     print("\n" + "=" * 70)
     print("SUMMARY")
@@ -319,6 +444,8 @@ if __name__ == "__main__":
         ("4. Cropped + detailed prompts", res4),
         ("5. Complete linkage clustering", res5),
         ("6. Average linkage clustering", res6),
+        ("7. Random forest of 5 keys (vote)", res7),
+        ("8. Forest + cropping", res8),
     ]
     for name, res in experiments:
         print(f"{name:<45} {res['year_acc']:>5.1%} {res['gen_acc']:>5.1%}")
