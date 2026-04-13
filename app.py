@@ -41,9 +41,34 @@ def _(MODEL_DIR, DATA_DIR, json, Path):
     manifest = json.loads((DATA_DIR / "manifest.json").read_text())
     key_json = keygen.to_interactive_json(manifest)
 
+    # Load CLIP for text-based key evaluation
+    import clip as clip_module
+    import torch
+    clip_model, clip_preprocess = clip_module.load("ViT-B/32", device="cpu")
+
+    def walk_key_with_clip(node, image_path):
+        """Walk the dichotomous key using CLIP to answer each question."""
+        if node["type"] == "leaf":
+            return node["label"], []
+        question = node["question"]
+        feature = question.replace("Does it have ", "").rstrip("?")
+        img = clip_preprocess(Image.open(image_path).convert("RGB")).unsqueeze(0)
+        yes_text = f"a pickup truck with {feature}"
+        no_text = f"a pickup truck without {feature}"
+        tokens = clip_module.tokenize([yes_text, no_text])
+        with torch.no_grad():
+            logits, _ = clip_model(img, tokens)
+            probs = logits.softmax(dim=-1).squeeze()
+        answer = probs[0].item() > probs[1].item()
+        label, path = walk_key_with_clip(
+            node["yes"] if answer else node["no"], image_path
+        )
+        return label, [(question, answer, float(probs[0]), float(probs[1]))] + path
+
     return (
         classifier, gradcam, keygen, manifest, key_json,
         YEAR_TO_GENERATION, extract_zone_activations,
+        walk_key_with_clip,
     )
 
 
@@ -74,7 +99,7 @@ def _(mo):
 
 
 @app.cell
-def _(upload, mo, cv2, Image, Path, io, base64, tempfile, classifier, gradcam, extract_zone_activations, YEAR_TO_GENERATION):
+def _(upload, mo, cv2, Image, Path, io, base64, tempfile, classifier, gradcam, extract_zone_activations, YEAR_TO_GENERATION, key_json, walk_key_with_clip):
     def _img_to_data_uri(img_array, fmt="png"):
         img_rgb = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
         pil = Image.fromarray(img_rgb)
@@ -114,22 +139,48 @@ def _(upload, mo, cv2, Image, Path, io, base64, tempfile, classifier, gradcam, e
             for name, val in sorted_zones
         )
 
+        # Walk the dichotomous key with CLIP
+        key_pred, key_path = walk_key_with_clip(key_json, tmp_path)
+        key_gen = YEAR_TO_GENERATION.get(key_pred, "Unknown")
+        key_steps = "\n".join(
+            f"| {q} | {'Yes' if a else 'No'} | {yp:.0%} / {np:.0%} |"
+            for q, a, yp, np in key_path
+        )
+
+        match_emoji = "=" if pred_label == key_pred else "!="
+        agree_text = "**agree**" if pred_label == key_pred else "**disagree**"
+
         result = mo.md(f"""
-## Classification Result
+## Classification Results
 
-**Predicted Year:** {pred_label} ({generation})
+| | Embedding Classifier | Text-Based Key (CLIP) |
+|---|---|---|
+| **Predicted Year** | {pred_label} | {key_pred} |
+| **Generation** | {generation} | {key_gen} |
+| **Confidence** | {confidence:.1%} | — |
+| **Method** | ResNet-50 cosine k-NN | CLIP answers yes/no questions |
 
-**Confidence:** {confidence:.1%}
+The two methods {agree_text} ({pred_label} {match_emoji} {key_pred}).
 
 | Original | Grad-CAM Overlay |
 |----------|-----------------|
 | ![original]({orig_uri}) | ![gradcam]({overlay_uri}) |
 
-### Top 5 Predictions
+### Embedding Classifier — Top 5
 
 | Year | Probability |
 |------|-------------|
 {prob_table}
+
+### Text-Based Key — Decision Path
+
+CLIP walked the dichotomous key by answering each question:
+
+| Question | Answer | Yes% / No% |
+|----------|--------|-------------|
+{key_steps}
+
+Result: **{key_pred}**
 
 ### Feature Zone Activations
 
