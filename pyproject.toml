@@ -9,11 +9,15 @@ dependencies = [
     "Pillow",
     "easyocr",
     "scikit-learn",
+    "scipy",
     "numpy",
     "matplotlib",
     "graphviz",
     "marimo",
     "opencv-python-headless",
+    "clip @ git+https://github.com/openai/CLIP.git",
+    "ftfy",
+    "regex",
 ]
 
 [project.optional-dependencies]
