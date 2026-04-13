@@ -2,9 +2,11 @@
 
 ![1970 Ford F-100](docs/1970_f100.webp)
 
-A one-shot machine learning pipeline that classifies Ford F-1 (1948-1952) and F-100 (1953-1979) pickup trucks by model year from front-profile illustrations, and automatically generates a dichotomous identification key — all from a single illustration per truck year.
+A one-shot machine learning pipeline that classifies Ford F-1 (1948-1952) and F-100 (1953-1979) pickup trucks by model year from front-profile illustrations, automatically generates a text-based dichotomous identification key, and then tests whether machines can use the keys they generate — all from a single illustration per truck year.
 
-The entire system is built on **one illustration per class** (27 classes, 33 images total — a few years have an alternate view). There is no training dataset in the traditional sense. Instead, the pipeline combines frozen pretrained models (ResNet-50, CLIP ViT-B/32) with one-shot cosine similarity matching, zero-shot visual question answering, and hierarchical clustering to produce both a classifier and a human-usable identification key without ever fine-tuning a neural network.
+The central question: **can a vision-language model generate a dichotomous key from images, and then use that same key to identify new images?** The pipeline produces a text-based key with questions like "Does it have a horizontal bar grille?" and "Does it have pronounced rounded fenders?", then evaluates whether CLIP can answer its own questions accurately enough to navigate the key to the correct leaf. The answer turns out to be: not very well (27% generation accuracy vs. 97% for the embedding-based classifier) — suggesting these keys are better tools for humans than for the machines that wrote them.
+
+The entire system is built on **one illustration per class** (27 classes, 33 images total — a few years have an alternate view). There is no training dataset in the traditional sense. The pipeline combines frozen pretrained models (ResNet-50, CLIP ViT-B/32) with one-shot cosine similarity matching, zero-shot visual question answering, and hierarchical clustering to produce both a classifier and a human-usable identification key without ever fine-tuning a neural network.
 
 ### Generated dichotomous key
 
