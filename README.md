@@ -182,6 +182,30 @@ The key with CLIP is above random chance at the generation level (27% vs 17%) bu
 
 Run the evaluation: `python src/fordera/evaluate_key.py`
 
+### Iterating on key strategies
+
+We ran six experiments to see if different key construction or CLIP prompting strategies could improve the text-based key's classification accuracy. The question: is the 27% generation accuracy a hard limit of text-based keys, or can we do better with smarter prompting, cropping, or tree structure?
+
+| # | Strategy | Year | Generation |
+|---|---|---|---|
+| 1 | **Baseline** — standard key + standard CLIP prompts | 3.0% | 27.3% |
+| 2 | **Cropped to region of interest** — crop grille/bumper/hood before asking CLIP | 6.1% | **33.3%** |
+| 3 | **Detailed prompts** — "a front view illustration of a classic Ford pickup truck that has..." | 3.0% | 24.2% |
+| 4 | **Cropped + detailed prompts** combined | 3.0% | 15.2% |
+| 5 | **Complete linkage** clustering instead of Ward's | 6.1% | 30.3% |
+| 6 | **Average linkage** clustering instead of Ward's | **9.1%** | 27.3% |
+| | *Random chance* | *3.7%* | *16.7%* |
+
+**Findings:**
+
+- **Cropping helps the most** (Experiment 2). Showing CLIP just the grille when asking about grilles — rather than the full truck — improves generation accuracy from 27% to 33%. This makes sense: CLIP has less visual noise to contend with.
+- **More detailed prompts hurt** (Experiment 3). Adding context like "front view illustration of a classic Ford" made CLIP *worse*, possibly because the longer prompts shift attention away from the distinguishing feature.
+- **Combining cropping + detailed prompts is worse than either alone** (Experiment 4). The two strategies interfere — the detailed prompt overwhelms the signal from the cropped region.
+- **Alternative clustering methods make small differences** (Experiments 5-6). Average linkage slightly improves year accuracy but not generation accuracy. The tree structure matters less than CLIP's ability to answer the questions.
+- **The ceiling is low.** Even the best strategy (cropped, 33%) is far below the embedding classifier (97%). The information bottleneck of converting visual features to yes/no text questions loses too much discriminative signal. These keys encode knowledge that humans can apply (count the grille bars, look at the headlight shape) but that CLIP's zero-shot visual QA cannot reliably extract from 224px illustrations.
+
+Run the experiments: `python src/fordera/key_experiments.py`
+
 ## Algorithms and references
 
 | Component | Algorithm | Reference |
