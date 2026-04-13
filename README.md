@@ -1,6 +1,12 @@
 # Fordera
 
+![1970 Ford F-100](docs/1970_f100.webp)
+
 A machine learning pipeline that classifies Ford F-1 (1948-1952) and F-100 (1953-1979) pickup trucks by model year from front-profile photographs, and automatically generates a dichotomous identification key.
+
+### Generated dichotomous key
+
+![Dichotomous Key](docs/dichotomous_key.png)
 
 ## Architecture
 
