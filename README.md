@@ -2,7 +2,9 @@
 
 ![1970 Ford F-100](docs/1970_f100.webp)
 
-A machine learning pipeline that classifies Ford F-1 (1948-1952) and F-100 (1953-1979) pickup trucks by model year from front-profile illustrations, and automatically generates a dichotomous identification key.
+A one-shot machine learning pipeline that classifies Ford F-1 (1948-1952) and F-100 (1953-1979) pickup trucks by model year from front-profile illustrations, and automatically generates a dichotomous identification key — all from a single illustration per truck year.
+
+The entire system is built on **one illustration per class** (27 classes, 33 images total — a few years have an alternate view). There is no training dataset in the traditional sense. Instead, the pipeline combines frozen pretrained models (ResNet-50, CLIP ViT-B/32) with one-shot cosine similarity matching, zero-shot visual question answering, and hierarchical clustering to produce both a classifier and a human-usable identification key without ever fine-tuning a neural network.
 
 ### Generated dichotomous key
 
@@ -65,11 +67,11 @@ A machine learning pipeline that classifies Ford F-1 (1948-1952) and F-100 (1953
 
 **Preprocessor** (`src/fordera/preprocessor.py`) — Year text overlaid on the source images would let the model cheat (just OCR the year). EasyOCR detects text regions containing years, then OpenCV inpaints those regions. Images are resized to 224x224 for the ResNet backbone.
 
-**Feature Extractor / Classifier** (`src/fordera/classifier.py`) — A frozen ResNet50 (pretrained on ImageNet) extracts 2048-dimensional embeddings. Classification uses cosine-similarity k-NN with data augmentation (rotation, flip, color jitter) to stretch the tiny dataset. Leave-one-out evaluation shows 97% generation-level accuracy (32/33 correct) — the model reliably identifies which generation a truck belongs to, though distinguishing individual years within a generation is limited by the visual similarity of same-generation trucks.
+**Feature Extractor / Classifier** (`src/fordera/classifier.py`) — A frozen ResNet-50 (pretrained on ImageNet, never fine-tuned) extracts 2048-dimensional embeddings. Classification is one-shot cosine-similarity matching: a new image is compared against the single stored embedding per year class. No weights are learned. Data augmentation (rotation, flip, color jitter) is applied only to expand the k-NN reference set. Leave-one-out evaluation shows 97% generation-level accuracy (32/33 correct).
 
 **Grad-CAM Interpretability** (`src/fordera/interpretability.py`) — Applies Grad-CAM to ResNet50's final convolutional layer to produce spatial activation heatmaps. These show which image regions (grille, headlights, bumper, fenders) most influence the classification. Zone-level activation scores are extracted for 13 spatial regions.
 
-**CLIP Describer** (`src/fordera/describer.py`) — For each split in the dichotomous key, CLIP (ViT-B/32) compares the truck images on each side against a vocabulary of 35 visual feature descriptions (grille patterns, headlight shapes, bumper styles, hood shapes, etc.). The description that best separates the two groups becomes the question at that node. Ancestor questions are excluded to ensure diversity.
+**CLIP Describer** (`src/fordera/describer.py`) — CLIP (ViT-B/32) is used zero-shot to generate human-readable questions for the dichotomous key. For each split, it compares the truck illustrations on each side against a vocabulary of 35 visual feature descriptions (grille patterns, headlight shapes, bumper styles, hood shapes, etc.) — no training or fine-tuning, just CLIP's pretrained visual-language alignment. The description that best separates the two groups becomes the question at that node. Ancestor questions are excluded to ensure diversity.
 
 **Key Generator** (`src/fordera/keygen.py`) — Builds a balanced binary tree via Ward's hierarchical clustering on the ResNet embeddings. The tree is reordered so leaves flow chronologically (1948 on the left, 1979 on the right). Each split is labeled with a CLIP-generated English question. Outputs:
 - Interactive HTML tree with `<details>` elements and example truck illustrations at each node
@@ -145,7 +147,7 @@ The test suite covers:
 
 ## Key design decisions
 
-**Why cosine k-NN instead of fine-tuning?** With only 33 images across 27 classes, there isn't enough data to fine-tune even a small classifier head reliably. Cosine similarity on frozen ResNet embeddings is a natural fit for few-shot learning — it requires no training and generalizes well from single examples.
+**Why cosine k-NN instead of fine-tuning?** With one illustration per class, fine-tuning is impossible — there's nothing to train on. Cosine similarity on frozen ResNet embeddings is the natural choice for one-shot learning: store one embedding per class, compare new images by similarity. No weights are learned, no gradients computed.
 
 **Why hierarchical clustering instead of a decision tree?** A sklearn DecisionTreeClassifier trained on the Grad-CAM zone features couldn't distinguish all 27 classes (only 6-13 zone-level features for 27 classes). Hierarchical clustering on the full 2048-dim embeddings produces a balanced binary tree where every class is reachable, and CLIP provides the human-readable interpretation.
 
