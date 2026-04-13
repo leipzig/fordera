@@ -157,16 +157,13 @@ The test suite covers:
 
 ### ResNet k-NN classifier (primary model)
 
-Leave-one-out cross-validation on the 33-image dataset:
+Leave-one-out cross-validation on the 33-image dataset. Year-level LOO is not meaningful here since most years have only one image — holding it out leaves zero examples of that year. Generation-level accuracy is the honest metric:
 
 | Metric | Accuracy | Baseline (random) |
 |---|---|---|
-| Year-level | 0% (0/33) | 3.7% (1/27) |
 | Generation-level | **97%** (32/33) | 16.7% (1/6) |
 
-**Why is year-level accuracy 0%?** This is a structural ceiling, not a model failure. 21 of the 27 year classes have exactly one image. When that image is held out, there are zero examples of that year remaining — the nearest neighbor *must* be a different year. Year-level LOO accuracy can only be non-zero for the 6 years with two images (1967, 1968, 1969, 1970, 1978, 1979), and even then the two views of the same truck aren't guaranteed to be more similar to each other than to an adjacent year's front profile.
-
-The meaningful metric is **generation-level accuracy (97%)**, which tests something the data can actually answer: "does this truck look more like other trucks from its generation than trucks from other generations?" 32 of 33 images land in the correct generation. The single miss is the 1948-1950 F-1, whose nearest neighbor is a 1959 Gen 3 truck rather than the 1951 or 1952. On training data with augmentation, year-level accuracy is near 100%.
+32 of 33 images land in the correct generation. The single miss is the 1948-1950 F-1, whose nearest neighbor is a 1959 Gen 3 truck rather than the 1951 or 1952.
 
 ### Dichotomous key alone (CLIP as question-answerer, no classifier)
 
