@@ -2,7 +2,7 @@
 
 ![1970 Ford F-100](docs/1970_f100.webp)
 
-A machine learning pipeline that classifies Ford F-1 (1948-1952) and F-100 (1953-1979) pickup trucks by model year from front-profile photographs, and automatically generates a dichotomous identification key.
+A machine learning pipeline that classifies Ford F-1 (1948-1952) and F-100 (1953-1979) pickup trucks by model year from front-profile illustrations, and automatically generates a dichotomous identification key.
 
 ### Generated dichotomous key
 
@@ -72,13 +72,13 @@ A machine learning pipeline that classifies Ford F-1 (1948-1952) and F-100 (1953
 **CLIP Describer** (`src/fordera/describer.py`) — For each split in the dichotomous key, CLIP (ViT-B/32) compares the truck images on each side against a vocabulary of 35 visual feature descriptions (grille patterns, headlight shapes, bumper styles, hood shapes, etc.). The description that best separates the two groups becomes the question at that node. Ancestor questions are excluded to ensure diversity.
 
 **Key Generator** (`src/fordera/keygen.py`) — Builds a balanced binary tree via Ward's hierarchical clustering on the ResNet embeddings. The tree is reordered so leaves flow chronologically (1948 on the left, 1979 on the right). Each split is labeled with a CLIP-generated English question. Outputs:
-- Interactive HTML tree with `<details>` elements and example truck photos at each node
+- Interactive HTML tree with `<details>` elements and example truck illustrations at each node
 - Printable SVG/PDF via Graphviz
 
 **Marimo App** (`app.py`) — Reactive notebook serving as both the development environment and end-user application. Features:
 - Image upload with year prediction and confidence score
 - Grad-CAM heatmap overlay
-- Interactive dichotomous key with truck photos at decision nodes
+- Interactive dichotomous key with truck illustrations at decision nodes
 - Downloadable PDF key
 
 ## Data

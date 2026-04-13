@@ -53,7 +53,7 @@ def _(mo):
         """
         # Ford F-Series Pickup Classifier & Dichotomous Key
 
-        Upload a front-profile photo of a **Ford F-1 (1948-1952)** or **F-100 (1953-1979)**
+        Upload a front-profile illustration of a **Ford F-1 (1948-1952)** or **F-100 (1953-1979)**
         pickup truck to identify its model year.
 
         The classifier uses a pre-trained ResNet50 backbone with cosine-similarity matching.
@@ -68,7 +68,7 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    upload = mo.ui.file(filetypes=[".png", ".jpg", ".jpeg", ".webp"], label="Upload front-profile photo")
+    upload = mo.ui.file(filetypes=[".png", ".jpg", ".jpeg", ".webp"], label="Upload front-profile illustration")
     upload
     return (upload,)
 
@@ -230,7 +230,7 @@ def _(mo, key_json, cv2, Image, Path, io, base64):
 </details>"""
 
     root_html = html_map[id(key_json)]
-    full_html = f"<h2>Interactive Dichotomous Key</h2>\n<p><em>Click questions to expand. Each branch shows example truck photos.</em></p>\n{root_html}"
+    full_html = f"<h2>Interactive Dichotomous Key</h2>\n<p><em>Click questions to expand. Each branch shows example truck illustrations.</em></p>\n{root_html}"
     mo.Html(full_html)
     return
 
