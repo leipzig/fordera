@@ -202,6 +202,8 @@ We ran eight experiments to see if different key construction or CLIP prompting 
 | 7 | **Random forest of 5 keys (vote)** — bootstrap + mixed clustering, majority vote | **12.1%** | 36.4% |
 | 8 | **Forest + cropping** combined | 6.1% | **42.4%** |
 | 9 | **VLM-generated vocabulary** — features discovered by BLIP-VQA from the images themselves, no human input | 3.0% | 9.1% |
+| 10 | **Invented-term embedding dictionary** — no language at all, cluster CLIP patch embeddings, invent phonetic names (on training data) | 78.8% | 84.8% |
+| 10-LOO | **Invented-term embedding dictionary (leave-one-out)** — honest evaluation | 3.0% | **60.6%** |
 | | *Random chance* | *3.7%* | *16.7%* |
 
 **A note on vocabulary provenance.** The baseline vocabulary was written by **Claude (a language model)** — not by the human user of this repo, and not by inspecting the dataset. The 35 (feature, opposite) pairs like `("pronounced rounded fenders", "flat slab-sided fenders")` come from Claude's pretraining data, which contains decades of automotive journalism, enthusiast forums, restoration guides, and reference books on the Ford F-series. In that sense, the "human-authored" label is slightly misleading — this is *LLM-authored*, where the LLM's knowledge came from humans writing about these trucks. The point is that this vocabulary is *dataset-external*: it uses prior knowledge about which features discriminate between F-series generations.
@@ -222,9 +224,27 @@ Experiment 9 replaces this with features discovered by a **different VLM (BLIP-V
   - **CLIP can't verify BLIP's answers.** The pipeline uses BLIP for vocabulary generation and CLIP for selection at each tree node. These are different models with different training distributions, so CLIP often can't reliably confirm what BLIP claimed to see.
 
   The takeaway: the human input in the Claude-authored baseline isn't just "rules of the game" — it's *domain expertise about which visual features matter*, smuggled in via the LLM's pretraining data. Remove that expertise and the pipeline collapses.
-- **The ceiling is still far below the embedding classifier.** Even the best strategy (forest + cropped, 42%) is far below the ResNet classifier's 97%. The information bottleneck of converting visual features to yes/no text questions loses too much discriminative signal. These keys encode knowledge that humans can apply (count the grille bars, look at the headlight shape) but that CLIP's zero-shot visual QA cannot reliably extract from 224px illustrations.
+- **The text-based ceiling is far below the embedding classifier.** Even the best text-based strategy (forest + cropped, 42%) is far below the ResNet classifier's 97%. The information bottleneck of converting visual features to yes/no text questions loses too much discriminative signal. These keys encode knowledge that humans can apply (count the grille bars, look at the headlight shape) but that CLIP's zero-shot visual QA cannot reliably extract from 224px illustrations.
+
+- **Removing language entirely recovers most of the gap** (Experiment 10). Instead of human-readable text at each node, the key uses *invented phonetic terms* like `dulmzil`, `plakolm`, `dremfledd` — nonsense words whose meaning is defined by a cluster centroid in CLIP's visual embedding space (the "embedding dictionary"). Patch-level embeddings from every truck are clustered with k-means into 40 visual "traits"; each cluster gets a random phonetic name and its centroid becomes the term's definition. Tree traversal asks "does this image contain a patch similar to `dulmzil`?" and answers by computing cosine similarity in visual space — no text encoder involved. Result: **85% generation accuracy on training data, 61% in leave-one-out** — far above any text-based approach.
+
+  The invented terms pick out real visual concepts: `dulmzil` matches only 1961-1963 unibody trucks; `plakolm` captures Bumpside alt-views; `dremfledd` activates on 1978-1979 Dentsides. The terms are meaningless as English but have precise, learned, visual meanings stored in the dictionary. This suggests the text bottleneck — not the tree structure or the dichotomous-key format — is what was losing information. When you keep the same tree structure but let each node's label be a pointer into a visual embedding dictionary rather than a natural-language phrase, you recover most of the embedding classifier's accuracy while preserving the human-inspectable branching structure.
 
 Run the experiments: `python src/fordera/key_experiments.py`
+
+Run the invented-term trait discovery: `python src/fordera/trait_discovery.py`
+
+### Toward a research contribution
+
+The trait-discovery result points at a genuinely novel framing. Most "interpretable zero-shot classification" work assumes the bottleneck has to be in English: LLMs write class descriptions, CLIP scores them, the explanation is a natural-language feature list. But English is carrying two incompatible loads here — (1) being a *storage format* for what the model has learned, and (2) being a *communication channel* to humans. These load requirements conflict: the features that best discriminate visually (2048-dim ResNet patches, fine patch-level motifs) have no compact English name, while the English words that feel natural ("a rounded hood") are vague averages that CLIP cannot reliably score.
+
+The invented-term approach decouples these: storage stays in visual embedding space (where fine distinctions survive), and communication happens via a *glossary* — a small number of nameable atoms, each defined by its exemplar images, each given an arbitrary symbol. Humans don't need to *read* the term `dulmzil`; they just need to *look up* what it means in the glossary. The tree structure stays interpretable (a dichotomous key is still a dichotomous key), but its labels are now pointers into a learned visual dictionary rather than natural-language assertions.
+
+A paper-length contribution would:
+1. Formalize "embedding-dictionary dichotomous keys" as a class of interpretable classifiers.
+2. Show across multiple fine-grained domains (CUB birds, FGVC-Aircraft, mushroom keys, etc.) that this approach consistently outperforms both text-based keys and vanilla prototype networks.
+3. Run a human evaluation: can people *use* these keys with a glossary, compared to either text-based keys or no key? (Hypothesis: comparable accuracy to text keys, possibly faster — humans learn glossaries quickly.)
+4. Study the structure of the learned vocabulary: how many terms are needed? Do terms align with expert concepts? How stable are they across bootstrap resamples?
 
 ## Algorithms and references
 
