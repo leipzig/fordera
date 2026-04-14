@@ -20,6 +20,14 @@ Questions are in plain English ("Does it have a horizontal bar grille?"). CLIP w
 
 Questions are nonsense phonetic words (`dulmzil`, `plakolm`, `dremfledd`, ...) whose meaning is defined only by a visual embedding dictionary — each term is a k-means cluster of CLIP patch embeddings, and traversal is done by cosine similarity in visual space. No text encoder involved. Result: **61% generation accuracy in leave-one-out**, a ~45% improvement over the best text-based approach. The invented terms pick out real visual concepts (`dulmzil` = 1961-63 unibody era, `dremfledd` = 1978-79 Dentsides) without ever being assigned English names.
 
+### Visual glossary — what each invented term actually means
+
+![Invented-Term Glossary](docs/trait_glossary.png)
+
+Each row shows one invented term and the 4 image patches in the dataset whose CLIP embeddings are most similar to the term's centroid. This *is* the definition of the term — there is no English label. `dulmzil` means "the visual pattern in those four patches" and nothing else. When the tree asks "does this truck have `dulmzil`?", it is asking whether any patch in the input image's CLIP encoding is close enough (by cosine similarity) to the cluster centroid that defines `dulmzil`. Humans using the key would look up the row for `dulmzil` and ask themselves: does my truck look like those?
+
+Generate the glossary: `python src/fordera/trait_glossary_images.py`
+
 ## Architecture
 
 ```
