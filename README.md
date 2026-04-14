@@ -250,17 +250,27 @@ Run the experiments: `python src/fordera/key_experiments.py`
 
 Run the invented-term trait discovery: `python src/fordera/trait_discovery.py`
 
-### Toward a research contribution
+## Next steps — build on this
 
-The trait-discovery result points at a genuinely novel framing. Most "interpretable zero-shot classification" work assumes the bottleneck has to be in English: LLMs write class descriptions, CLIP scores them, the explanation is a natural-language feature list. But English is carrying two incompatible loads here — (1) being a *storage format* for what the model has learned, and (2) being a *communication channel* to humans. These load requirements conflict: the features that best discriminate visually (2048-dim ResNet patches, fine patch-level motifs) have no compact English name, while the English words that feel natural ("a rounded hood") are vague averages that CLIP cannot reliably score.
+This repo is a single-domain proof of concept (one truck model, 33 illustrations). The findings suggest several directions where a few days of work by someone else could produce a genuinely publishable contribution. PRs and forks welcome — if you run any of these, please open an issue and share your results.
 
-The invented-term approach decouples these: storage stays in visual embedding space (where fine distinctions survive), and communication happens via a *glossary* — a small number of nameable atoms, each defined by its exemplar images, each given an arbitrary symbol. Humans don't need to *read* the term `dulmzil`; they just need to *look up* what it means in the glossary. The tree structure stays interpretable (a dichotomous key is still a dichotomous key), but its labels are now pointers into a learned visual dictionary rather than natural-language assertions.
+**Scale to more domains.** The text-vs-invented-term gap is probably not Ford-specific. Run the same pipeline on [CUB-200](https://www.vision.caltech.edu/datasets/cub_200_2011/) (birds), [FGVC-Aircraft](https://www.robots.ox.ac.uk/~vgg/data/fgvc-aircraft/), Stanford Cars, mushroom field-guide photos, or leaf classification datasets. The scraper/preprocessor pattern is reusable; the interesting measurement is whether the invented-term vocabulary consistently outperforms LLM-authored vocabulary across domains, and whether the gap correlates with how much domain knowledge the LLM was pretrained on.
 
-A paper-length contribution would:
-1. Formalize "embedding-dictionary dichotomous keys" as a class of interpretable classifiers.
-2. Show across multiple fine-grained domains (CUB birds, FGVC-Aircraft, mushroom keys, etc.) that this approach consistently outperforms both text-based keys and vanilla prototype networks.
-3. Run a human evaluation: can people *use* these keys with a glossary, compared to either text-based keys or no key? (Hypothesis: comparable accuracy to text keys, possibly faster — humans learn glossaries quickly.)
-4. Study the structure of the learned vocabulary: how many terms are needed? Do terms align with expert concepts? How stable are they across bootstrap resamples?
+**Scale to larger datasets.** Most of the honest numbers here are limited by n=33. With 50+ examples per class, the invented-term LOO accuracy should climb substantially, and for the first time the gap between LLM-authored and VLM-discovered vocabularies can be measured with statistical significance.
+
+**Run a proper human evaluation.** The central untested claim is that humans can use the invented-term glossary at accuracy comparable to — or faster than — a text-based key. A Prolific study with ~30 participants and 3 conditions (no key, text key, invented-term key with glossary) would convert this into real evidence. Hypothesis: text keys are faster to learn but invented-term keys reach higher ceiling because the glossary shows exact visual exemplars.
+
+**Formalize the framing.** The two-jobs argument ("English was doing storage AND communication, and these conflict") wants a theoretical treatment. Information-theoretic formulation: measure I(image; label | key_path) for text-based vs. embedding-dictionary keys, predict the empirical gap from the bound.
+
+**Cross-model verification.** What happens if you use different VLMs on each side — e.g., SigLIP generates the vocabulary, CLIP scores it; or OpenCLIP clusters patches, DINOv2 verifies membership? The noise profile of "proposer" vs "verifier" models is a natural axis to explore and may reveal which model pairings are complementary.
+
+**Active vocabulary refinement.** Use the LOO confusion matrix to identify where the key fails, then iteratively add/modify terms to fix those failures. An algorithm that converges on a working vocabulary. (This is where a paper-worthy contribution probably lives — an adaptive method that gets more accurate with each round of error correction.)
+
+**Better invented-term naming.** The current phoneme generator is arbitrary. You could imagine: (a) syllables chosen to be maximally distinctive phonetically, (b) names systematically encoding the patch position ("fremble-top-left"), or (c) allowing humans to rename terms after inspecting the glossary, so the generated name and the meaning converge.
+
+**Use the tree for something useful.** Fordera's tree is a toy. The same pipeline could produce field-usable keys for invasive-plant identification, species surveys, insect ID for citizen science, or QA inspection in manufacturing. If you want a dichotomous key for real-world use, the invented-term approach might be the right tool.
+
+If you make progress on any of these, I'd love to hear about it. The experimental harness in `src/fordera/key_experiments.py` was designed to be extended — adding an experiment is 20 lines and a new entry in the results table.
 
 ## Algorithms and references
 
