@@ -8,9 +8,17 @@ The central question: **can a vision-language model generate a purely text-based
 
 The entire system is built on **one illustration per class** (27 classes, 33 images total — a few years have an alternate view). There is no training dataset in the traditional sense. The pipeline combines frozen pretrained models (ResNet-50, CLIP ViT-B/32) with one-shot cosine similarity matching, zero-shot visual question answering, and hierarchical clustering to produce both a classifier and a human-usable identification key without ever fine-tuning a neural network.
 
-### Generated dichotomous key
+### Generated text-based dichotomous key
 
 ![Dichotomous Key](docs/dichotomous_key.png)
+
+Questions are in plain English ("Does it have a horizontal bar grille?"). CLIP walks the tree by answering its own questions. Best result: 42% generation accuracy.
+
+### Generated invented-term dichotomous key
+
+![Invented-Term Tree](docs/trait_tree.png)
+
+Questions are nonsense phonetic words (`dulmzil`, `plakolm`, `dremfledd`, ...) whose meaning is defined only by a visual embedding dictionary — each term is a k-means cluster of CLIP patch embeddings, and traversal is done by cosine similarity in visual space. No text encoder involved. Result: **61% generation accuracy in leave-one-out**, a ~45% improvement over the best text-based approach. The invented terms pick out real visual concepts (`dulmzil` = 1961-63 unibody era, `dremfledd` = 1978-79 Dentsides) without ever being assigned English names.
 
 ## Architecture
 
