@@ -73,7 +73,9 @@ The entire system is built on **one illustration per class** (27 classes, 33 ima
 
 **Grad-CAM Interpretability** (`src/fordera/interpretability.py`) — Applies Grad-CAM to ResNet50's final convolutional layer to produce spatial activation heatmaps. These show which image regions (grille, headlights, bumper, fenders) most influence the classification. Zone-level activation scores are extracted for 13 spatial regions.
 
-**CLIP Describer** (`src/fordera/describer.py`) — CLIP (ViT-B/32) is used zero-shot to generate human-readable questions for the dichotomous key. For each split, it compares the truck illustrations on each side against a vocabulary of 35 visual feature descriptions (grille patterns, headlight shapes, bumper styles, hood shapes, etc.) — no training or fine-tuning, just CLIP's pretrained visual-language alignment. The description that best separates the two groups becomes the question at that node. Ancestor questions are excluded to ensure diversity.
+**CLIP Describer** (`src/fordera/describer.py`) — CLIP (ViT-B/32) is used zero-shot to **select** the best question for each split from a fixed vocabulary. The default vocabulary (`HUMAN_AUTHORED_VOCABULARY`) is 35 (feature, opposite) pairs I wrote based on prior knowledge of F-series styling — CLIP is not generating the text, only scoring which of the 35 candidates best separates the two groups of images at each split. Ancestor questions are excluded to ensure diversity.
+
+**VLM Vocabulary Generator** (`src/fordera/vlm_vocabulary.py`) — An alternative that removes human input from the vocabulary entirely. BLIP-VQA is asked ~16 visual questions about each truck ("What shape are the headlights?", "How many bars does the grille have?") and the distinguishing (question, answer) pairs become the vocabulary. Turns out this performs much worse than human-authored vocabulary (see experiment 9 below).
 
 **Key Generator** (`src/fordera/keygen.py`) — Builds a balanced binary tree via Ward's hierarchical clustering on the ResNet embeddings. The tree is reordered so leaves flow chronologically (1948 on the left, 1979 on the right). Each split is labeled with a CLIP-generated English question. Outputs:
 - Interactive HTML tree with `<details>` elements and example truck illustrations at each node
@@ -188,7 +190,7 @@ We ran eight experiments to see if different key construction or CLIP prompting 
 
 | # | Strategy | Year | Generation |
 |---|---|---|---|
-| 1 | **Baseline** — standard key + standard CLIP prompts | 3.0% | 27.3% |
+| 1 | **Baseline** — human-authored vocabulary + standard CLIP prompts | 3.0% | 27.3% |
 | 2 | **Cropped to region of interest** — crop grille/bumper/hood before asking CLIP | 6.1% | 33.3% |
 | 3 | **Detailed prompts** — "a front view illustration of a classic Ford pickup truck that has..." | 3.0% | 24.2% |
 | 4 | **Cropped + detailed prompts** combined | 3.0% | 15.2% |
@@ -196,7 +198,10 @@ We ran eight experiments to see if different key construction or CLIP prompting 
 | 6 | **Average linkage** clustering instead of Ward's | 9.1% | 27.3% |
 | 7 | **Random forest of 5 keys (vote)** — bootstrap + mixed clustering, majority vote | **12.1%** | 36.4% |
 | 8 | **Forest + cropping** combined | 6.1% | **42.4%** |
+| 9 | **VLM-generated vocabulary** — features discovered by BLIP-VQA from the images themselves, no human input | 3.0% | 9.1% |
 | | *Random chance* | *3.7%* | *16.7%* |
+
+**A note on vocabulary provenance.** The baseline uses a **human-authored vocabulary** — 35 (feature, opposite) pairs I wrote based on prior knowledge of F-series styling (e.g., "pronounced rounded fenders" / "flat slab-sided fenders"). CLIP's role is selection: at each tree split, it scores every candidate and picks the best one. The vocabulary itself comes from a human. Experiment 9 replaces this with features **discovered by a VLM from the images themselves**: BLIP-VQA answers specific visual questions about each truck ("What shape are the headlights?", "How many bars does the grille have?"), and the distinguishing answers become the vocabulary. No human input on what features matter.
 
 **Findings:**
 
@@ -205,6 +210,7 @@ We ran eight experiments to see if different key construction or CLIP prompting 
 - **Cropping alone helps** (Experiment 2). Showing CLIP just the grille when asking about grilles — rather than the full truck — improves generation accuracy from 27% to 33%.
 - **More detailed prompts hurt** (Experiments 3-4). Longer prompts shift CLIP's attention away from the distinguishing feature and make it worse, not better.
 - **Alternative clustering methods make small differences** (Experiments 5-6). The tree structure matters less than CLIP's ability to answer the questions.
+- **Machine-generated vocabulary is *worse* than human-authored** (Experiment 9). Letting BLIP-VQA discover features from the images themselves — no human input — drops generation accuracy from 27% to 9% (below random chance). The VLM produces noisy, hallucinated, or overly-specific phrases ("a grille grille", "a grilled grille", "a grille with 4 bars") that CLIP (a different model) then struggles to verify. The human-authored vocabulary encodes decades of accumulated knowledge about what actually distinguishes F-series generations; the VLM just answers surface-level questions. This is one of the more surprising findings — the "zero human input" pipeline performs substantially worse, because the human input wasn't just the rules of the game, it was the *domain expertise* about which visual features matter.
 - **The ceiling is still far below the embedding classifier.** Even the best strategy (forest + cropped, 42%) is far below the ResNet classifier's 97%. The information bottleneck of converting visual features to yes/no text questions loses too much discriminative signal. These keys encode knowledge that humans can apply (count the grille bars, look at the headlight shape) but that CLIP's zero-shot visual QA cannot reliably extract from 224px illustrations.
 
 Run the experiments: `python src/fordera/key_experiments.py`

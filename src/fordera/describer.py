@@ -14,10 +14,12 @@ import torch
 from PIL import Image
 
 
-# Vocabulary of visual features observable on Ford F-series front profiles.
-# Each entry is (feature_description, opposite_description) so the question
-# can be phrased as "Does it have [feature]?" with Yes/No answers.
-FEATURE_VOCABULARY = [
+# Human-authored vocabulary of visual features observable on Ford F-series
+# front profiles. Authored based on prior knowledge of F-series styling,
+# not derived from the images themselves. Each entry is
+# (feature_description, opposite_description) so the question can be
+# phrased as "Does it have [feature]?" with Yes/No answers.
+HUMAN_AUTHORED_VOCABULARY = [
     # Grille patterns
     ("a horizontal bar grille", "a mesh or egg-crate grille"),
     ("a single wide horizontal grille bar", "multiple thin grille bars"),
@@ -60,6 +62,9 @@ FEATURE_VOCABULARY = [
     ("parking lights above the headlights", "parking lights below the headlights"),
     ("a horizontal character line on the fenders", "no character line on the fenders"),
 ]
+
+# Backwards compatibility alias
+FEATURE_VOCABULARY = HUMAN_AUTHORED_VOCABULARY
 
 
 # Map keywords in questions to crop regions (y_start, y_end, x_start, x_end)

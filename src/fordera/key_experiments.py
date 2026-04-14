@@ -18,6 +18,7 @@ from fordera.classifier import FeatureExtractor, YEAR_TO_GENERATION
 from fordera.describer import (
     CLIPDescriber,
     FEATURE_VOCABULARY,
+    HUMAN_AUTHORED_VOCABULARY,
     crop_region_for_question,
 )
 
@@ -392,6 +393,33 @@ if __name__ == "__main__":
     print(f"  Generation accuracy: {res7['gen_acc']:.1%} ({res7['gen_correct']}/{res7['total']})")
 
     print("\n" + "=" * 70)
+    print("EXPERIMENT 9: VLM-generated vocabulary — features discovered by BLIP-VQA")
+    print("=" * 70)
+    # Load VLM-generated vocabulary if available
+    vlm_vocab_path = Path(__file__).parent.parent.parent / "outputs" / "vlm_vocabulary.json"
+    if vlm_vocab_path.exists():
+        vlm_data = json.loads(vlm_vocab_path.read_text())
+        vlm_vocab = [tuple(pair) for pair in vlm_data["vocabulary"]]
+        print(f"  Loaded {len(vlm_vocab)} VLM-generated features")
+
+        # Temporarily swap the describer's vocabulary
+        import fordera.describer as describer_module
+        original_vocab = describer_module.FEATURE_VOCABULARY
+        describer_module.FEATURE_VOCABULARY = vlm_vocab
+        describer_vlm = CLIPDescriber()
+
+        key_vlm = build_standard_key(root, unique_labels, manifest, describer_vlm)
+        res_vlm = evaluate_key(key_vlm, manifest, ans1)
+        print(f"  Year accuracy:       {res_vlm['year_acc']:.1%} ({res_vlm['year_correct']}/{res_vlm['total']})")
+        print(f"  Generation accuracy: {res_vlm['gen_acc']:.1%} ({res_vlm['gen_correct']}/{res_vlm['total']})")
+
+        # Restore
+        describer_module.FEATURE_VOCABULARY = original_vocab
+    else:
+        print("  VLM vocabulary not found. Run src/fordera/vlm_vocabulary.py first.")
+        res_vlm = {"year_acc": 0.0, "gen_acc": 0.0, "year_correct": 0, "gen_correct": 0, "total": 33}
+
+    print("\n" + "=" * 70)
     print("EXPERIMENT 8: Forest + cropping — vote + crop to region of interest")
     print("=" * 70)
     forest_cropped_results = []
@@ -438,7 +466,7 @@ if __name__ == "__main__":
     print(f"{'Experiment':<45} {'Year':>6} {'Gen':>6}")
     print("-" * 60)
     experiments = [
-        ("1. Baseline (standard key + CLIP)", res1),
+        ("1. Baseline (human-authored vocab + CLIP)", res1),
         ("2. Cropped to region of interest", res2),
         ("3. Detailed prompts", res3),
         ("4. Cropped + detailed prompts", res4),
@@ -446,6 +474,7 @@ if __name__ == "__main__":
         ("6. Average linkage clustering", res6),
         ("7. Random forest of 5 keys (vote)", res7),
         ("8. Forest + cropping", res8),
+        ("9. VLM-generated vocabulary (BLIP-VQA)", res_vlm),
     ]
     for name, res in experiments:
         print(f"{name:<45} {res['year_acc']:>5.1%} {res['gen_acc']:>5.1%}")
